@@ -1,0 +1,97 @@
+---
+title: "try try try"
+author: "Iris Foxfoot"
+date: "10/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(raster)
+library(sf)
+library(sp)
+library(e1071)
+```
+
+```{r}
+#read in data
+
+#arundo 100% shapefiles
+arundo_training_data <- read_sf(here("arundo_poly"))
+
+#not arundo shapefiles
+not_arundo_training_data <- read_sf(here("UpperwatershedPolygons", "UpperwatershedPolygons.shp")) %>% 
+  filter(ArundoPres == 0) %>% 
+  slice(1:5)
+
+not_arundo_training_data <- as(not_arundo_training_data, "sf") %>% 
+  st_zm(what = "ZM")
+
+#naip
+naip <- brick(here("NAIP_clipped.tif"))
+```
+
+```{r}
+#veiw naip
+plotRGB(naip)
+
+plot(not_arundo_training_data)
+```
+
+```{r}
+#extract raster values from arundo polygon
+arundo_extracted <- extract(naip, arundo_training_data, df = T)
+names(arundo_extracted) <- c("poly", "r", "g", "b")
+
+#making arundo column
+arundo_extracted$arundo_1 <- 1
+```
+
+```{r}
+#extent from not arundo polys
+not_arundo_extracted <- extract(naip, not_arundo_training_data, df = T)
+names(not_arundo_extracted) <- c("poly", "r", "g", "b")
+
+#filling arundo column with zeros because it's not present
+not_arundo_extracted$arundo_1 <- 0
+```
+
+```{r}
+# Combine data frames and subset only 5000 random values from the non-pipeline training data
+training.df <- rbind(arundo_extracted, not_arundo_extracted[sample(nrow(not_arundo_extracted), 5000),])
+```
+
+```{r}
+# Divide training data into a train-subset and a test-subset
+train <- sample(nrow(training.df), round((nrow(training.df) - 1) / 2, 0))
+test <- c(1:nrow(training.df))[!(c(1:nrow(training.df)) %in% train)]
+trainset.df <- training.df[train,]
+testset.df <- training.df[test,]
+```
+
+```{r}
+# Fit best SVM using tuning
+require(e1071)
+svm.fit <- svm(factor(arundo_1)~., data = trainset.df, gamma = 10^(-6:-1), cost = 10^(-1:1))
+
+summary(svm.fit)
+
+#git change
+```
+
+```{r}
+# Fit predictions and print error matrix
+svm.pred <- predict(svm.fit, testset.df)
+
+library(caret)
+confusionMatrix(svm.pred, factor(testset.df$arundo_1))
+```
+
+```{r}
+# Fit tuned SVM to entire training set
+svm.fit.all <- svm(factor(arundo_1)~., data = training.df, gamma = 10^(-6:-1), cost = 10^(-1:1))
+
+```
+
+
