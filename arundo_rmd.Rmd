@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(here)
 library(raster)
+#library(tidyverse)
 library(sf)
 library(sp)
 library(e1071)
@@ -41,7 +42,7 @@ plot(not_arundo_training_data)
 
 ```{r}
 #extract raster values from arundo polygon
-arundo_extracted <- extract(naip, arundo_training_data, df = T)
+arundo_extracted <- raster::extract(naip, arundo_training_data, df = T)
 names(arundo_extracted) <- c("poly", "r", "g", "b")
 
 #making arundo column
@@ -50,7 +51,7 @@ arundo_extracted$arundo_1 <- 1
 
 ```{r}
 #extent from not arundo polys
-not_arundo_extracted <- extract(naip, not_arundo_training_data, df = T)
+not_arundo_extracted <- raster::extract(naip, not_arundo_training_data, df = TRUE)
 names(not_arundo_extracted) <- c("poly", "r", "g", "b")
 
 #filling arundo column with zeros because it's not present
@@ -59,7 +60,8 @@ not_arundo_extracted$arundo_1 <- 0
 
 ```{r}
 # Combine data frames and subset only 5000 random values from the non-pipeline training data
-training.df <- rbind(arundo_extracted, not_arundo_extracted[sample(nrow(not_arundo_extracted), 5000),])
+training.df <- rbind(arundo_extracted, not_arundo_extracted[sample(nrow(not_arundo_extracted), 5000),]) %>% 
+  select("r", "b", "g", "arundo_1")
 ```
 
 ```{r}
